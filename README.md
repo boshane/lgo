@@ -1,5 +1,5 @@
 # lgo
-### _Your Name <dbeauchesne@gmail.com>_
+### Dan Beauchesne <dbeauchesne@gmail.com>_
 
 ## Go game (囲碁) in Common Lisp
 
