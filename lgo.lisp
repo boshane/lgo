@@ -1,6 +1,7 @@
 ;;;; lgo - Go board game in Common Lisp and McClim
 ;;;; Dan Beauchesne
 ;;;; 2021-11-23
+;;
 
 (in-package #:lgo)
 
