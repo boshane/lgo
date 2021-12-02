@@ -17,7 +17,8 @@
 (defclass field ()
   ((col :initarg :col :reader col)
    (row :initarg :row :reader row)
-   (stone :initform nil :accessor stone)))
+   (stone :initform nil :accessor stone)
+   (group :initform nil :accessor group)))
 
 (defun print-board-array (board-array)
   (let ((array-size (array-dimensions board-array)))
@@ -42,19 +43,21 @@
   (let ((field-stone (stone field)))
     (if field-stone
         (ecase (player field-stone)
-          (:player-black *black-char*)
-          (:player-white *white-char*))
+          (:black *black-char*)
+          (:white *white-char*))
         #\_)))
 
 (defun toggle-player (game-state)
-  (setf (player game-state)
-        (ecase (player game-state)
-          (:player-black :player-white)
-          (:player-white :player-black))))
+  (setf (current-player game-state)
+        (ecase (current-player game-state)
+          (:black :white)
+          (:white :black))))
+
+(defun update-board-array ())
 
 (defun place-stone (game-state dst-field)
   (if (not (stone dst-field))
-      (let* ((current-player (player game-state))
+      (let* ((current-player (current-player game-state))
              (new-stone (make-instance 'stone :player current-player :field dst-field)))
         (setf (stone dst-field) new-stone)
         (toggle-player game-state)
@@ -69,19 +72,27 @@
 
 (defclass game-state ()
   ((board :initarg :board :reader board)
-   (player :initarg :player :accessor player)
    (locked :initarg :locked :accessor locked)
-   (active-field :initarg :active-field :accessor active-field)
-   (game-over :initarg :game-over :accessor :game-over))
+   (game-over :initarg :game-over :accessor :game-over)
+   (current-player :initarg :current-player :accessor current-player)
+   (black :initarg :black :accessor black)
+   (white :initarg :white :accessor white))
   (:default-initargs :board (make-instance 'board)
-                     :player :player-black
+                     :black (make-instance 'player)
+                     :white (make-instance 'player)
+                     :current-player :black
                      :locked nil
                      :game-over nil))
+
+(defclass player ()
+  ((groups :initarg :groups :initform nil :accessor groups)
+   (color :initarg :color :accessor color)))
 
 (defclass board ()
   ((size :initarg :size :initform *default-size* :accessor size)
    (field-array :initarg :field-array :accessor field-array
                 :initform (make-board *default-size*))))
+
 (defclass board-view (gadget-view) ())
 
 (defmethod activep ((field field))
@@ -90,14 +101,14 @@
 
 (defun player-color (player-name)
   (ecase player-name
-  (:player-black +black+)
-  (:player-white +white+)))
+  (:black +black+)
+  (:white +white+)))
 
 (defun switch-player (game-state)
   (setf (player game-state)
         (ecase (player game-state)
-          (:player-black :player-white)
-          (:player-white :player-black))))
+          (:black :white)
+          (:white :black))))
 
 (defun new-game (game-state)
   (with-slots (board player locked game-over active-field)
@@ -137,12 +148,12 @@
     (with-scaling (pane *square-size* *square-size*)
               (present nil 'board :stream pane :single-box t))))
 
-(define-lgo-command (command-quit :name t) ()
-  (frame-exit *application-frame*))
-
 (defun test-field (dst-field &rest args)
   (declare (ignore args))
   t)
+
+(define-lgo-command (command-quit :name t) ()
+  (frame-exit *application-frame*))
 
 (define-lgo-command (command-select-field :name t)
     ((dst-field 'field :gesture (:select :tester test-field)))

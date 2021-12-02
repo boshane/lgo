@@ -1,10 +1,12 @@
 ;;;; lgo.asd
 
 (asdf:defsystem #:lgo
-  :description "Describe lgo here"
-  :author "Your Name <your.name@example.com>"
-  :license  "Specify license here"
-  :version "0.0.1"
+  :description "Go board game in Common Lisp"
+  :author "Dan Beauchesne"
+  :license  "MIT"
+  :version "0.0.2"
   :serial t
   :components ((:file "package")
-               (:file "lgo")))
+               (:file "math" :depends-on ("package"))
+               (:file "game-logic" :depends-on ("math"))
+               (:file "lgo" :depends-on ("game-logic"))))

@@ -1,5 +1,5 @@
 # lgo
-### Dan Beauchesne <dbeauchesne@gmail.com>_
+### Dan Beauchesne <dbeauchesne@gmail.com>
 
 ## Go game (囲碁) in Common Lisp
 
@@ -11,6 +11,3 @@
 - Rudimentary AI that can beat absolute beginners
 
 ## License
-
-Specify license here
-
