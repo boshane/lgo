@@ -11,13 +11,22 @@
 (defparameter *black-char* #\*)
 (defparameter *white-char* #\^)
 
+(defstruct (vertices (:constructor v (x y)))
+  x
+  y)
+
+(defun vy (field)
+  (vertices-y (vertices field)))
+
+(defun vx (field)
+  (vertices-x (vertices field)))
+
 (defclass stone ()
   ((player :initarg :player :reader player)
    (field :initarg :field :accessor field)))
 
 (defclass field ()
-  ((col :initarg :col :reader col)
-   (row :initarg :row :reader row)
+  ((vertices :initarg :vertices :accessor vertices)
    (stone :initform nil :accessor stone)
    (group :initform nil :accessor group)))
 
@@ -36,7 +45,7 @@
          (fields (make-array (list x y))))
     (dotimes (row x)
       (dotimes (col y)
-        (let ((field (make-instance 'field :row row :col col)))
+        (let ((field (make-instance 'field :vertices (v row col))))
           (setf (aref fields row col) field))))
     fields))
 
@@ -59,12 +68,14 @@
 (defun place-stone (game-state dst-field)
   (if (not (stone dst-field))
       (let* ((current-player (current-player game-state))
-             (new-stone (make-instance 'stone :player current-player :field dst-field)))
+             (new-stone (make-instance 'stone :player current-player :field dst-field))
+             (dst-row (vy dst-field))
+             (dst-col (vx dst-field)))
         (setf (stone dst-field) new-stone)
+        (prin1 (get-adjacent-to dst-field (field-array (board game-state))) *debug-io*)
         (toggle-player game-state)
-        (format *debug-io* "~A places stone at ~A ~A~%" current-player (col dst-field) (row dst-field))
-        (print-board-array (field-array (board game-state))))
-      (format *debug-io* "Stone already exists at ~A, ~A~%" (col dst-field) (row dst-field))))
+        (format *debug-io* "~A places stone at ~A ~A~%" current-player dst-col dst-row))))
+;;        (print-board-array (field-array (board game-state)
 
 (defun get-field (game-state row col)
   (let ((array (field-array (board game-state))))
@@ -164,14 +175,17 @@
 ;; Presentation for the stones
 (define-presentation-method present
   ((stone stone) (type stone) stream (view board-view) &key)
-  (let* ((stone-color (player-color (player stone))))
-    (draw-circle* stream (col (field stone)) (row (field stone)) .45 :ink stone-color)))
+  (let* ((stone-color (player-color (player stone)))
+         (cur-field (field stone))
+         (x (vx cur-field))
+         (y (vy cur-field)))
+    (draw-circle* stream x y .45 :ink stone-color)))
 
 ;; Presentation for the fields
 (define-presentation-method present
     ((field field) (type field) stream (view board-view) &key)
-  (let* ((x (col field))
-         (y (row field))
+  (let* ((x (vx field))
+         (y (vy field))
          (stone (stone field)))
     (if stone
         (present stone 'stone :view view)
