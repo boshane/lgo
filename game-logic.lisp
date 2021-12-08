@@ -12,25 +12,28 @@
           (format *debug-io* "~A " (aref arr i j)))
         (terpri *debug-io*)))))
 
+(defun place-stone (game-state dst-field &optional player)
+  (let ((stone-at-field (stone dst-field))
+        (current-player (if player
+                            player
+                            (current-player game-state))))
+    (if (not stone-at-field)
+        (let* ((new-stone (make-instance 'stone :player current-player :field dst-field))
+              (dst-row (vy dst-field))
+              (dst-col (vx dst-field)))
+          (setf (stone dst-field) new-stone)
+          (toggle-player game-state)))))
+
 (defun occupied? (vert arr &optional player)
   "Is the field at vertices VERT in board array ARR occupied? If so, occupied by PLAYER?"
-    (and (stone (aref arr (vy vert) (vx vert)))
+  (let ((field-at-vert (aref arr (vertices-x vert) (vertices-y vert))))
+    (and (stone field-at-vert)
          (if player
-             (and (equalp player (player (stone (aref arr (vy vert) (vx vert)))))
+             (and (equalp player (player (stone field-at-vert)))
                 vert)
-             vert)))
+             vert))))
 
-(defun get-adjacent-to (field arr)
-  "Find any adjacent stones surrounding field FIELD in array ARR"
-  (let* ((field-vertices (vertices field))
-         (field-player (player (stone field)))
-         (adj-verts (adjacent-vertices field-vertices)))
-    (mapcan #'(lambda (x)
-                (when (occupied? (aref arr (vertices-y x) (vertices-x x)) arr field-player)
-                  (list x)))
-            adj-verts)))
-
-(defun adjacent-vertices (vert)
+(defun adjacent-vertices (vert &optional (max 9))
   "Return a list of valid vertices surrounding vertices VERT"
   (let* ((x (vertices-x vert))
          (y (vertices-y vert))
@@ -42,18 +45,32 @@
                       (v (1+ x) (1+ y))
                       (v (1- x) (1+ y))
                       (v (1+ x) (1- y)))))
-    ;; Remove vertices below zero
-    ;; TODO: Add MAX parameter and remove vertices above
     (mapcan #'(lambda (x) (unless (or (eq -1 (vertices-x x))
-                                      (eq -1 (vertices-y x)))
+                                      (eq -1 (vertices-y x))
+                                      (> (vertices-x x) max)
+                                      (> (vertices-y x) max))
                             (list x)))
             verts)))
 
-(defun single-or-group (vert arr)
-  (let ((adjacent-list (adjacent-takenp vert arr)))
-    (when adjacent-list
-      (let ((group?
-              (if (listp adjacent-list)
-                  (mapcan #'(lambda (x) (list (vertices-group x))) adjacent-list)
-                  (vertices-group adjacent-list))))
-        group?))))
+;; TODO: Find a more lisp-y way of doing this (recursive, LOOP, ?)
+;;
+(defun find-group (start-node arr player)
+  "Find groups of nodes starting with node START-NODE in array ARR."
+  (let ((nodes '())
+        (start-vertices (vertices start-node)))
+    (flet ((member-node (node)
+             (member node nodes :test #'(lambda (x y)
+                                          (and (eq (vertices-x x) (vertices-x y))
+                                               (eq (vertices-y x) (vertices-y y)))))))
+      (let ((pending-nodes '()))
+        (labels ((do-next-node (next)
+                   (and next
+                        (let ((node-vertices (adjacent-vertices next)))
+                          (dolist (n node-vertices)
+                            (and (occupied? n arr player)
+                                 (unless (member-node n)
+                                   (push n nodes))
+                                 (push n pending-nodes)))
+                          (do-next-node (pop pending-nodes))))))
+          (do-next-node start-vertices))))
+    nodes))

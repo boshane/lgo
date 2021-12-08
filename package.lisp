@@ -1,5 +1,5 @@
 ;;;; package.lisp
 
 (defpackage #:lgo
-  (:use #:clim #:clim-lisp)
+  (:use #:clim #:clim-lisp #:clim-tab-layout)
   (:export #:lgo-ui))

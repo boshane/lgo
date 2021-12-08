@@ -21,6 +21,10 @@
 (defun vx (field)
   (vertices-x (vertices field)))
 
+(defclass group ()
+  ((members :initarg :members :reader members)
+   (num :initarg :num :initform 1 :accessor num)))
+
 (defclass stone ()
   ((player :initarg :player :reader player)
    (field :initarg :field :accessor field)))
@@ -40,6 +44,7 @@
         (terpri *debug-io*)))))
 
 (defun make-board (size)
+  "Generate a board of size SIZExSIZE and populate it with empty field objects."
   (let* ((x size)
          (y x)
          (fields (make-array (list x y))))
@@ -64,18 +69,6 @@
           (:white :black))))
 
 (defun update-board-array ())
-
-(defun place-stone (game-state dst-field)
-  (if (not (stone dst-field))
-      (let* ((current-player (current-player game-state))
-             (new-stone (make-instance 'stone :player current-player :field dst-field))
-             (dst-row (vy dst-field))
-             (dst-col (vx dst-field)))
-        (setf (stone dst-field) new-stone)
-        (prin1 (get-adjacent-to dst-field (field-array (board game-state))) *debug-io*)
-        (toggle-player game-state)
-        (format *debug-io* "~A places stone at ~A ~A~%" current-player dst-col dst-row))))
-;;        (print-board-array (field-array (board game-state)
 
 (defun get-field (game-state row col)
   (let ((array (field-array (board game-state))))
@@ -131,23 +124,55 @@
           game-over nil
          active-field nil)))
 
+(define-presentation-type special-page ())
+
 (define-application-frame lgo (standard-application-frame game-state)
   ()
-  (:pointer-documentation t)
-  (:panes (output :application
-                  :display-function 'display
-                  :scroll-bars nil
-                  :background +grey80+
-                  :width (* *window-size* *square-size*)
-                  :min-width (* *window-size* *square-size*)
-                  :max-width (* *window-size* *square-size*)
-                  :height (* *window-size* *square-size*)
-                  :min-height (* *window-size* *square-size*)
-                  :max-height (* *window-size* *square-size*)
-                  :default-view (make-instance 'board-view))
-          (input :application
-                 :max-height 128))
-  (:menu-bar nil))
+  (:panes
+   (vs-player :application
+              :display-function 'display
+              :scroll-bars nil
+              :background +grey80+
+              :width (* *window-size* *square-size*)
+              :min-width (* *window-size* *square-size*)
+              :max-width (* *window-size* *square-size*)
+              :height (* *window-size* *square-size*)
+              :min-height (* *window-size* *square-size*)
+              :max-height (* *window-size* *square-size*)
+              :default-view (make-instance 'board-view))
+   (vs-sequence :application
+                :display-function 'display
+                :scroll-bars nil
+                :background +grey80+
+                :width (* *window-size* *square-size*)
+                :min-width (* *window-size* *square-size*)
+                :max-width (* *window-size* *square-size*)
+                :height (* *window-size* *square-size*)
+                :min-height (* *window-size* *square-size*)
+                :max-height (* *window-size* *square-size*)
+                :default-view (make-instance 'board-view))
+   (vs-ai :application
+          :display-function 'display
+          :scroll-bars nil
+          :background +grey80+
+          :width (* *window-size* *square-size*)
+          :min-width (* *window-size* *square-size*)
+          :max-width (* *window-size* *square-size*)
+          :height (* *window-size* *square-size*)
+          :min-height (* *window-size* *square-size*)
+          :max-height (* *window-size* *square-size*)
+          :default-view (make-instance 'board-view))
+   (io :interactor :height 150 :width 600)
+   (pointer-doc :pointer-documentation))
+  (:layouts
+   (default
+    (vertically ()
+      (with-tab-layout ('tab-page :name 'board-tabs :height 200)
+        ("Player vs. Player" vs-player)
+        ("Sequence Playthrough" vs-sequence)
+        ("Player vs. AI" vs-ai))
+      io
+      pointer-doc))))
 
 (defun winnerp (game-state)
   nil)
@@ -179,7 +204,8 @@
          (cur-field (field stone))
          (x (vx cur-field))
          (y (vy cur-field)))
-    (draw-circle* stream x y .45 :ink stone-color)))
+    (draw-circle* stream x y .45 :ink stone-color)
+    (draw-text* stream (format nil "~A,~A" x y) (- x .2) y :ink +red+)))
 
 ;; Presentation for the fields
 (define-presentation-method present
