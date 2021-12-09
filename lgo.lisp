@@ -31,8 +31,7 @@
 
 (defclass field ()
   ((vertices :initarg :vertices :accessor vertices)
-   (stone :initform nil :accessor stone)
-   (group :initform nil :accessor group)))
+   (stone :initform nil :accessor stone)))
 
 (defun print-board-array (board-array)
   (let ((array-size (array-dimensions board-array)))
@@ -127,52 +126,42 @@
 (define-presentation-type special-page ())
 
 (define-application-frame lgo (standard-application-frame game-state)
-  ()
+  ((selected-stone :initform nil))
   (:panes
    (vs-player :application
               :display-function 'display
               :scroll-bars nil
               :background +grey80+
-              :width (* *window-size* *square-size*)
-              :min-width (* *window-size* *square-size*)
-              :max-width (* *window-size* *square-size*)
-              :height (* *window-size* *square-size*)
-              :min-height (* *window-size* *square-size*)
-              :max-height (* *window-size* *square-size*)
               :default-view (make-instance 'board-view))
-   (vs-sequence :application
-                :display-function 'display
-                :scroll-bars nil
-                :background +grey80+
-                :width (* *window-size* *square-size*)
-                :min-width (* *window-size* *square-size*)
-                :max-width (* *window-size* *square-size*)
-                :height (* *window-size* *square-size*)
-                :min-height (* *window-size* *square-size*)
-                :max-height (* *window-size* *square-size*)
-                :default-view (make-instance 'board-view))
-   (vs-ai :application
-          :display-function 'display
-          :scroll-bars nil
-          :background +grey80+
-          :width (* *window-size* *square-size*)
-          :min-width (* *window-size* *square-size*)
-          :max-width (* *window-size* *square-size*)
-          :height (* *window-size* *square-size*)
-          :min-height (* *window-size* *square-size*)
-          :max-height (* *window-size* *square-size*)
-          :default-view (make-instance 'board-view))
-   (io :interactor :height 150 :width 600)
+   (debug :application :display-function #'display-debug
+          :display-time :command-loop)
    (pointer-doc :pointer-documentation))
   (:layouts
    (default
-    (vertically ()
-      (with-tab-layout ('tab-page :name 'board-tabs :height 200)
-        ("Player vs. Player" vs-player)
-        ("Sequence Playthrough" vs-sequence)
-        ("Player vs. AI" vs-ai))
-      io
+    (vertically (:width 800 :height 600)
+      (with-tab-layout ('tab-page :name 'board-tabs)
+        ("Player vs. Player" vs-player))
+      debug
       pointer-doc))))
+
+(defun display-debug (frame pane)
+  (let* ((*standard-output* pane)
+         (current-stone (slot-value frame 'selected-stone))
+         (current-field (field current-stone))
+         (current-player (player current-stone))
+         (group (find-group current-field (field-array (board *application-frame*)) current-player)))
+    (surrounding-output-with-border (pane)
+      (formatting-table (pane :x-spacing 125)
+        (formatting-row (pane)
+          (formatting-cell (pane) (format pane "Location"))
+          (formatting-cell (pane) (format pane "Group")))
+        (formatting-row (pane)
+          (formatting-cell (pane)
+            (when current-stone
+              (format pane "   ~A ~A" (vx (field current-stone)) (vy (field current-stone)))))
+          (formatting-cell (pane)
+            (when current-stone
+              (format pane "~{~A~}" group))))))))
 
 (defun winnerp (game-state)
   nil)
@@ -189,6 +178,10 @@
   (declare (ignore args))
   t)
 
+(define-lgo-command (command-select-stone :name t)
+    ((stone 'stone :gesture (:select :tester test-field)))
+  (setf (slot-value *application-frame* 'selected-stone) stone))
+
 (define-lgo-command (command-quit :name t) ()
   (frame-exit *application-frame*))
 
@@ -204,8 +197,7 @@
          (cur-field (field stone))
          (x (vx cur-field))
          (y (vy cur-field)))
-    (draw-circle* stream x y .45 :ink stone-color)
-    (draw-text* stream (format nil "~A,~A" x y) (- x .2) y :ink +red+)))
+    (draw-circle* stream x y .45 :ink stone-color)))
 
 ;; Presentation for the fields
 (define-presentation-method present

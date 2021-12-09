@@ -1,0 +1,7 @@
+* Inbox
+** TODO Set tabs for debug, hints, etc
+
+[[file:~/src/lgo/lgo.lisp::define-application-frame lgo (standard-application-frame game-state]]
+** TODO Detect enclosing groups
+
+[[file:~/src/lgo/game-logic.lisp][file:~/src/lgo/game-logic.lisp]]
