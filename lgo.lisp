@@ -5,9 +5,9 @@
 
 (in-package #:lgo)
 
-(defparameter *window-size* 10)
-(defparameter *default-size* 10)
-(defparameter *square-size* 72)
+(defparameter *window-size* 20)
+(defparameter *default-size* 20)
+(defparameter *square-size* 36)
 (defparameter *black-char* #\*)
 (defparameter *white-char* #\^)
 
@@ -141,27 +141,32 @@
     (vertically (:width 800 :height 600)
       (with-tab-layout ('tab-page :name 'board-tabs)
         ("Player vs. Player" vs-player))
-      debug
+      (with-tab-layout ('tab-page :name 'info-tabs)
+        ("Debug info" debug))
       pointer-doc))))
 
+(defun print-group-verts (verts)
+    (mapcar #'(lambda (x) (format t "[~A,~A]" (vertices-x x) (vertices-y x))) verts))
+
 (defun display-debug (frame pane)
-  (let* ((*standard-output* pane)
-         (current-stone (slot-value frame 'selected-stone))
-         (current-field (field current-stone))
-         (current-player (player current-stone))
-         (group (find-group current-field (field-array (board *application-frame*)) current-player)))
-    (surrounding-output-with-border (pane)
-      (formatting-table (pane :x-spacing 125)
-        (formatting-row (pane)
-          (formatting-cell (pane) (format pane "Location"))
-          (formatting-cell (pane) (format pane "Group")))
-        (formatting-row (pane)
-          (formatting-cell (pane)
-            (when current-stone
-              (format pane "   ~A ~A" (vx (field current-stone)) (vy (field current-stone)))))
-          (formatting-cell (pane)
-            (when current-stone
-              (format pane "~{~A~}" group))))))))
+  (and (slot-value frame 'selected-stone)
+    (let* ((*standard-output* pane)
+           (current-stone (slot-value frame 'selected-stone))
+           (current-field (field current-stone))
+           (current-player (player current-stone))
+           (group (find-group current-field (field-array (board *application-frame*)) current-player)))
+      (surrounding-output-with-border (pane)
+        (formatting-table (pane :x-spacing 125)
+          (formatting-row (pane)
+            (formatting-cell (pane) (format pane "Location"))
+            (formatting-cell (pane) (format pane "Group")))
+          (formatting-row (pane)
+            (formatting-cell (pane)
+              (when current-stone
+                (format pane "   ~A ~A" (vx (field current-stone)) (vy (field current-stone)))))
+            (formatting-cell (pane)
+              (and group
+                   (print-group-verts group)))))))))
 
 (defun winnerp (game-state)
   nil)
