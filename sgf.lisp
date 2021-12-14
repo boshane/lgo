@@ -29,11 +29,11 @@
       (let ((len (length source))
             (rtable (loop for (regex . token) in (loop for (regex token) in +sgf-tokens+
                                                        collect (cons regex token))
-                          for s = (cl-ppcre::parse-string regex)
-                          for a = (cl-ppcre:create-scanner `(:sequence
+                          for sexp = (cl-ppcre::parse-string regex)
+                          for anchor = (cl-ppcre:create-scanner `(:sequence
                                                              :modeless-start-anchor
-                                                             ,s))
-                          collect (cons a token))))
+                                                             ,sexp))
+                          collect (cons anchor token))))
         (unless pos (setf pos 0))
         (setf end len)
         (assert (<= 0 pos end len))
@@ -51,6 +51,15 @@
     (format t "-"))
   (format t ">"))
 
+(defmacro casepr (keyform &rest cases)
+  "Wrapper for 'case' macro: test KEYFORM against CASES but print the car of a matching case."
+    (let ((test (gensym)))
+      `(let ((test ,keyform))
+         (case test
+         ,@(loop for (test prog) in cases
+                 collect (cons test (list (progn '(print test))
+                                          prog)))))))
+
 (defmethod parse-sgf-string ((lexer sgf-lexer))
   (let ((current-position (pos lexer))
         (depth (tree-depth lexer)))
@@ -59,7 +68,7 @@
       (let* ((tok-sym (get-next-token lexer))
              (tok-pos (cdr tok-sym))
              (sym (car tok-sym)))
-        (ecase (car tok-sym)
+        (casepr (car tok-sym)
           (lparen (setf (slot-value lexer 'tree-depth) (1+ depth)))
           (rparen (setf (slot-value lexer 'tree-depth) (1- depth)))
           (semicolon (format t "~A~%" sym))
