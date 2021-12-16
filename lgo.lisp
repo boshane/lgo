@@ -175,9 +175,9 @@
   t)
 
 (defun display (frame pane)
-  (with-first-quadrant-coordinates (pane 0 (* *window-size* *square-size*))
+  (with-first-quadrant-coordinates (pane *square-size* (* (1+ *default-size*) *square-size*))
     (with-scaling (pane *square-size* *square-size*)
-              (present nil 'board :stream pane :single-box t))))
+        (present nil 'board :stream pane :single-box t))))
 
 (defun test-field (dst-field &rest args)
   (declare (ignore args))
@@ -220,12 +220,13 @@
   (let* ((ink +burlywood3+)
          (board-size (size (board *application-frame*)))
          (table-size (1- board-size)))
-    (with-first-quadrant-coordinates (stream 0 (* (1+ board-size) *square-size*)))
-    (with-translation (stream 0.5 0.5)
-      (draw-rectangle* stream 0 0 table-size table-size :ink ink)
+    (with-translation (stream 1 1)
+      (draw-rectangle* stream -.5 -.5
+                       (- *default-size* .5)
+                       (- *default-size* .5)
+                       :ink ink)
       (dotimes (row board-size)
         (dotimes (col board-size)
-          ;; Draw the grid lines
           (cond ((zerop row) (draw-line* stream col row col (+ row table-size)))
                 ((zerop col) (draw-line* stream col row (+ col table-size) row)))
           (present (get-field *application-frame* row col) 'field :view view))))))

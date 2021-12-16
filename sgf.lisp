@@ -5,14 +5,13 @@
 (in-package :lgo)
 
 (defconstant +sgf-version+ 4)
-(setf +sgf-tokens+
-  '(("[\]]" rbrack)
-    ("[\[]" lbrack)
-    ("[\(]" lparen)
-    ("[\)]" rparen)
-    ("[\;]" semicolon)
-    ("[\:]" colon)
-    ("[a-zA-Z]+" property-name)))
+(defparameter +sgf-tokens+ '(("[\(]" lparen)
+                     ("[\)]" rparen)
+                     ("[\;]" semicolon)
+                     ("[\:]" colon)
+                     ("[a-zA-Z]+" property-name)
+                     ("\[[a-zA-Z0-9]+\]" parameters)
+                     ("." unknown)))
 
 ;; PROPERTY VALUE TYPE FUNCTION
 (defvar *properties*
@@ -44,7 +43,7 @@
          (declare (ignorable test))
          (case test
          ,@(loop for (test prog) in cases
-                 collect (cons test (list (progn '(prin1 test))
+                 collect (cons test (list (progn '(format t "~A~%" test))
                                           prog)))))))
 
 (defstruct sgf-move
@@ -76,6 +75,7 @@
    (pos    :initarg :pos :reader pos)
    (len    :initarg :len :reader len)
    (end    :initarg :end :reader end)
+   (active-token    :initarg :active-token :reader active-token)
    (regex-table :initarg :regex-table :reader regex-table)))
 
 (defclass sgf-node ()
@@ -104,47 +104,58 @@
   (setf (slot-value lexer 'pos) (1+ (slot-value lexer 'pos))))
 
 (defmethod get-next-token ((lexer sgf-lexer))
-  (let ((token (loop for (regex . sym) in (regex-table lexer)
-        for next = (nth-value 1 (cl-ppcre:scan regex (source lexer) :start (pos lexer)))
-        when next do (return (cons sym next)))))
-    (if token
-        token
-        (signal 'unknown-token :unknown-token :unknown))))
+  (handler-bind ((error #'no-next-token-match))
+    (catch :cannot-parse
+      (let ((token-pos (loop for (regex . sym) in (regex-table lexer)
+                             for next = (nth-value 1 (cl-ppcre:scan regex (source lexer) :start (pos lexer)))
+                             when next do (return (cons sym next)))))
+        (if token-pos
+            token-pos
+            (signal 'no-match :no-next-token-match :unknown))))))
 
-(defun print-depth (depth)
-  (terpri)
-  (dotimes (n depth)
-    (format t "-"))
-  (format t "> "))
+(define-condition lexer-error (error)
+  ((%unknown-token :reader :unknown-token :initarg :unknown-token)
+   (%no-match :reader :no-match :initarg :no-match)))
 
-(defmethod read-property ((lexer sgf-lexer))
-  (let ((tok (get-next-token lexer)))
-    (and (assoc tok *properties*)
-         (print tok))))
-
-(define-condition unknown-token (error)
-  ((%unknown-token :reader :unknown-token :initarg :unknown-token )))
+(defun no-next-token-match (condition)
+  (declare (ignore condition))
+  (format t "NO-REGEX-MATCH~%")
+  (throw :cannot-parse nil))
 
 (defun skip-token (condition)
   (declare (ignore condition))
-  (format t "Token skipped~%")
-  (throw :do-not-parse nil))
+  (format t "UNKNOWN-TOKEN~%")
+  (throw :cannot-parse nil))
 
-(defun parse-sgf-string (lexer &key ((:expect expect) nil))
+(defun print-depth (lexer)
+  (terpri)
+  (dotimes (n (tree-depth lexer))
+    (princ "-"))
+  (princ "> "))
+
+(defun assign-token (token-string lexer)
+  (let ((tok (intern (string-upcase token-string))))
+    (if (assoc tok *properties*)
+        (setf (slot-value lexer 'active-token) tok)
+        (signal 'unknown-token :unknown-token :unknown))))
+
+(defun execute-token (lexer)
+  (if (not (active-token lexer))
+      (format t "Parse error: active token is ~A~%" (active-token lexer))
+      (format t "Executing token ~A~%" (active-token lexer))))
+
+(defun lex-sgf-string (lexer)
   (let ((current-position (pos lexer))
         (depth (tree-depth lexer)))
     (unless (equal (end lexer) current-position)
-      (let* ((tok-sym (handler-bind ((unknown-token #'skip-token))
-                        (catch :do-not-parse
-                          (get-next-token lexer))))
+      (let* ((tok-sym (get-next-token lexer))
              (next-pos (cdr tok-sym)))
         (and tok-sym
-             (case (car tok-sym)
-               (lparen (setf (slot-value lexer 'tree-depth) (1+ depth)))
-               (rparen (setf (slot-value lexer 'tree-depth) (1- depth)))
-               (semicolon (print tok-sym))
-               (property-name (print 'property))
-               (colon (print tok-sym))
-               (t t))
-             (setf (slot-value lexer 'pos) next-pos)
-             (parse-sgf-string lexer))))))
+             (casepr (car tok-sym)
+                     (lparen (setf (slot-value lexer 'tree-depth) (1+ depth)))
+                     (rparen (setf (slot-value lexer 'tree-depth) (1- depth)))
+                     (semicolon (setf (slot-value lexer 'active-token) nil))
+                     (property-name (assign-token (subseq (source lexer) (pos lexer) next-pos) lexer))
+                     (parameters (execute-token lexer))))
+        (setf (slot-value lexer 'pos) next-pos)
+        (lex-sgf-string lexer)))))
