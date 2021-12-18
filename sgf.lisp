@@ -36,6 +36,13 @@
     (:gm (1 16))
     (:st (0 3))))
 
+(defun validate-parameters (parameters expected)
+  (and parameters
+       (and expected
+            t)))
+
+
+
 (defmacro casepr (keyform &rest cases)
   "Wrapper for 'case' macro: test KEYFORM against CASES but print the car of a matching case."
     (let ((test (gensym)))
@@ -113,6 +120,14 @@
             token-pos
             (signal 'no-match :no-next-token-match :unknown))))))
 
+(define-condition handler-error (error)
+  ((%no-handler-function :reader :no-handler-function :initarg :no-handler-function)))
+
+(defun handler-function-nil (condition)
+  (declare (ignore condition))
+  (format t "NO-HANDLER-FUNCTION~%")
+  (throw :cannot-call nil))
+
 (define-condition lexer-error (error)
   ((%unknown-token :reader :unknown-token :initarg :unknown-token)
    (%no-match :reader :no-match :initarg :no-match)))
@@ -127,22 +142,32 @@
   (format t "UNKNOWN-TOKEN~%")
   (throw :cannot-parse nil))
 
-(defun print-depth (lexer)
-  (terpri)
-  (dotimes (n (tree-depth lexer))
-    (princ "-"))
-  (princ "> "))
-
 (defun assign-token (token-string lexer)
   (let ((tok (intern (string-upcase token-string))))
     (if (assoc tok *properties*)
         (setf (slot-value lexer 'active-token) tok)
         (signal 'unknown-token :unknown-token :unknown))))
 
+(defmacro make-command (name parameters expect &optional (fun nil))
+  (unless fun
+    (setf fun '(signal 'no-handler-function :no-handler-function :nil)))
+  `(defun ,name (,parameters ,expect)
+     (when (validate-parameters ,parameters ,expect)
+       (handler-bind ((handler-error #'handler-function-nil))
+         (catch :cannot-call
+           (funcall ,fun ,parameters))))))
+
 (defun execute-token (lexer)
   (if (not (active-token lexer))
       (format t "Parse error: active token is ~A~%" (active-token lexer))
       (format t "Executing token ~A~%" (active-token lexer))))
+
+(defun extract-parameter-string (str)
+  (multiple-value-bind (i j)
+      (cl-ppcre:scan "[a-z]+" str)
+    (when (and i
+               (and j))
+      (subseq str i j))))
 
 (defun lex-sgf-string (lexer)
   (let ((current-position (pos lexer))

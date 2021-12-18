@@ -6,10 +6,13 @@
 (in-package #:lgo)
 
 (defparameter *window-size* 20)
-(defparameter *default-size* 20)
+(defparameter *default-size* 10)
 (defparameter *square-size* 36)
 (defparameter *black-char* #\*)
 (defparameter *white-char* #\^)
+(defparameter *board-labels*
+  (map 'list #'princ-to-string
+       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
 (defstruct (vertices (:constructor v (x y)))
   x
@@ -36,8 +39,7 @@
 (defun print-board-array (board-array)
   (let ((array-size (array-dimensions board-array)))
     (destructuring-bind (m n) array-size
-      (loop for i from (1- m) downto 0 do ;; Clim field index rows from the bottom of the pane
-                                          ;; so we have to flip it to print the grid
+      (loop for i from (1- m) downto 0 do
         (loop for j from 0 below n do
           (format *debug-io* "~A " (char-from-field (aref board-array i j))))
         (terpri *debug-io*)))))
@@ -139,8 +141,7 @@
   (:layouts
    (default
     (vertically (:width 800 :height 600)
-      (with-tab-layout ('tab-page :name 'board-tabs)
-        ("Player vs. Player" vs-player))
+      vs-player
       (with-tab-layout ('tab-page :name 'info-tabs)
         ("Debug info" debug))
       pointer-doc))))
@@ -174,10 +175,7 @@
 (defun valid-move-p (game-state stone dst-field)
   t)
 
-(defun display (frame pane)
-  (with-first-quadrant-coordinates (pane *square-size* (* (1+ *default-size*) *square-size*))
-    (with-scaling (pane *square-size* *square-size*)
-        (present nil 'board :stream pane :single-box t))))
+
 
 (defun test-field (dst-field &rest args)
   (declare (ignore args))
@@ -214,22 +212,37 @@
         (present stone 'stone :view view)
         (draw-circle* stream x y .20 :ink +transparent-ink+))))
 
+(defun display (frame pane)
+  (with-first-quadrant-coordinates (pane *square-size* (* (1+ *default-size*) *square-size*))
+    (with-scaling (pane 32 32)
+      (with-translation (pane 2 1)
+        (present nil 'board :stream pane :single-box t)))))
+
 ;; Presentation for the board itself
 (define-presentation-method present
     (object (type board) stream (view board-view) &key)
   (let* ((ink +burlywood3+)
          (board-size (size (board *application-frame*)))
          (table-size (1- board-size)))
-    (with-translation (stream 1 1)
-      (draw-rectangle* stream -.5 -.5
-                       (- *default-size* .5)
-                       (- *default-size* .5)
-                       :ink ink)
-      (dotimes (row board-size)
-        (dotimes (col board-size)
-          (cond ((zerop row) (draw-line* stream col row col (+ row table-size)))
-                ((zerop col) (draw-line* stream col row (+ col table-size) row)))
-          (present (get-field *application-frame* row col) 'field :view view))))))
+    (draw-rectangle* stream -1 -1
+                     (1+ table-size)
+                     (1+ table-size) :ink ink)
+    (dotimes (rows *default-size*)
+      (dotimes (cols *default-size*)
+        (and (zerop cols)
+             (draw-line* stream rows 0 rows table-size))
+        (and (zerop rows)
+             (draw-line* stream 0 cols table-size cols))))
+    ;; TODO: Do this more elegantly, maybe with proper text alignment at least
+    (with-translation (stream -.08 -.9)
+      (loop for x from 0 upto table-size
+            do (draw-text* stream (nth x *board-labels*) x 0)))
+    (with-translation (stream -.9 -.1)
+      (loop for y from 0 upto table-size
+            do (draw-text* stream (nth y *board-labels*) 0 y)))
+    (dotimes (i board-size)
+      (dotimes (j board-size)
+        (present (get-field *application-frame* i j) 'field :view view)))))
 
 (defparameter *frame* nil)
 (defun lgo-ui ()
